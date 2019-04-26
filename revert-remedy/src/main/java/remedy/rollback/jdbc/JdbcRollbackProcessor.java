@@ -42,18 +42,19 @@ public class JdbcRollbackProcessor implements IRollbackProcessor {
     public boolean rollbackByTransactionId(final String transactionId) {
         executor.submit(() -> {
             final List<TransactionLog> transactionLogs = loadTransactionLogByTransactionId(transactionId);
+            startJdbcTransaction();
             for (final TransactionLog transactionLog : transactionLogs) {
                 String rollbackSql = generateRollbackSql(transactionLog);
-                startJdbcTransaction();
-                final boolean persistSuccess = persistRollbackSql(transactionLog.getId(), rollbackSql);
-                if (persistSuccess) {
-                    if (executeRollBackSql(transactionLog.getSchemaName(), rollbackSql)) {
-                        commitJdbcTransaction();
-                    }
-                } else {
+                if (!persistRollbackSql(transactionLog.getId(), rollbackSql)) {
                     rollbackJdbcTransaction();
+                    return;
+                }
+                if (!executeRollBackSql(transactionLog.getSchemaName(), rollbackSql)) {
+                    rollbackJdbcTransaction();
+                    return;
                 }
             }
+            commitJdbcTransaction();
         });
         return true;
     }
@@ -70,7 +71,7 @@ public class JdbcRollbackProcessor implements IRollbackProcessor {
         if (GlobalConstants.INSERT.equals(transactionLog.getDmlType())) {
             String tableName = transactionLog.getTableName();
             String primaryKeyName = transactionLog.getKeyName();
-            String primaryKeyValue = transactionLog.getKeyName();;
+            String primaryKeyValue = transactionLog.getKeyValue();;
             for (TableRowDesc row : transactionLog.getAfterDataDescList()) {
                 if (row.getName().equals(primaryKeyName)) {
                     JDBCType primaryType = JDBCType.valueOf(row.getType());
