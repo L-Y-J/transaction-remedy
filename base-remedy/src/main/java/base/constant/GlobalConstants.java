@@ -1,5 +1,8 @@
 package base.constant;
 
+/**
+ * @author liyongjie
+ */
 public class GlobalConstants {
 
     public static String INSERT = "INSERT";

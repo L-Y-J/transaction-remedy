@@ -65,7 +65,7 @@ public class SimpleProcessCallBackImpl implements IProcessCallBack {
     @Override
     public void saveSql(final String sql) {
         if (processStatusEnum == ProcessStatusEnum.TRANSACTION_START) {
-
+            // EMPTY
         } else if (processStatusEnum == ProcessStatusEnum.DATA_INSERT
                 || processStatusEnum == ProcessStatusEnum.DATA_UPDATE
                 || processStatusEnum == ProcessStatusEnum.DATA_DELETE) {

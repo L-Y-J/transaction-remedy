@@ -72,7 +72,7 @@ public class JdbcRollbackProcessor implements IRollbackProcessor {
         if (GlobalConstants.INSERT.equals(transactionLog.getDmlType())) {
             String tableName = transactionLog.getTableName();
             String primaryKeyName = transactionLog.getKeyName();
-            String primaryKeyValue = transactionLog.getKeyValue();;
+            String primaryKeyValue = transactionLog.getKeyValue();
             for (TableRowDesc row : transactionLog.getAfterDataDescList()) {
                 if (row.getName().equals(primaryKeyName)) {
                     JDBCType primaryType = JDBCType.valueOf(row.getType());
