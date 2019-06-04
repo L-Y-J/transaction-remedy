@@ -8,6 +8,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
@@ -75,29 +76,62 @@ public class JdbcRollbackProcessor implements IRollbackProcessor {
             for (TableRowDesc row : transactionLog.getAfterDataDescList()) {
                 if (row.getName().equals(primaryKeyName)) {
                     JDBCType primaryType = JDBCType.valueOf(row.getType());
-					switch(primaryType) {
-                        case BIT:
-                        case TINYINT:
-                        case SMALLINT:
-                        case INTEGER:
-                        case BIGINT:
-                        case FLOAT:
-                        case REAL:
-                        case DOUBLE:
-                        case NUMERIC:
-                        case DECIMAL:
-                            break;
-                        default: 
-                            primaryKeyValue = "'"  + primaryKeyName +"'";
-                            break;
-                    }
+					primaryKeyValue = wrapValueWithQuotes(primaryType, primaryKeyValue);
                 }
             }
             return String.format(SqlStatementConstants.DELETE_STATEMENT, tableName, primaryKeyName, primaryKeyValue);
         } else if (GlobalConstants.DELETE.equals(transactionLog.getDmlType())) {
-            
+            String tableName = transactionLog.getTableName();
+            StringBuilder columnNamesBuilder = new StringBuilder();
+            StringBuilder columnValuesBuilder = new StringBuilder();
+            for (final TableRowDesc row : transactionLog.getBeforeDataDescList()) {
+                columnNamesBuilder.append(row.getName()).append(",");
+                String columnValue = wrapValueWithQuotes(JDBCType.valueOf(row.getType()), row.getValue());
+                columnValuesBuilder.append(columnValue).append(",");
+            }
+            String columnNames = StringUtils.removeEnd(columnNamesBuilder.toString(), ",");
+            String columnValues = StringUtils.removeEnd(columnValuesBuilder.toString(), ",");
+            return String.format(SqlStatementConstants.INSERT_STATEMENT, tableName, columnNames, columnValues);
+        } else if (GlobalConstants.UPDATE.equals(transactionLog.getDmlType())) {
+            String tableName = transactionLog.getTableName();
+            String primaryKeyName = transactionLog.getKeyName();
+            String primaryKeyValue = transactionLog.getKeyValue();
+            StringBuilder updatedColumnsBuilder = new StringBuilder();
+            final List<TableRowDesc> beforeDataDescList = transactionLog.getBeforeDataDescList();
+            final List<TableRowDesc> afterDataDescList = transactionLog.getAfterDataDescList();
+            for (int i = 0; i < beforeDataDescList.size(); i++) {
+                final TableRowDesc before = beforeDataDescList.get(i);
+                final TableRowDesc after = afterDataDescList.get(i);
+                if (!StringUtils.equals(before.getValue(), after.getValue())) {
+                    final String beforeName = before.getName();
+                    String beforeValue = wrapValueWithQuotes(JDBCType.valueOf(before.getType()), before.getValue());
+                    updatedColumnsBuilder.append(beforeName).append("=").append(beforeValue).append(",");
+                }
+            }
+            String updatedColumns = StringUtils.removeEnd(updatedColumnsBuilder.toString(), ",");
+            return String.format(SqlStatementConstants.UPDATE_STATEMENT, tableName, updatedColumns, primaryKeyName, primaryKeyValue);
         }
         return null;
+    }
+
+    private String wrapValueWithQuotes(JDBCType type, String value) {
+        switch(type) {
+            case BIT:
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+            case FLOAT:
+            case REAL:
+            case DOUBLE:
+            case NUMERIC:
+            case DECIMAL:
+                break;
+            default:
+                value = "'"  + value +"'";
+                break;
+        }
+        return value;
     }
 
     private boolean persistRollbackSql(Long id, String rollbackSql) {
